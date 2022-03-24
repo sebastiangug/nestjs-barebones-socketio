@@ -1,4 +1,4 @@
-import { InjectRedis, RedisService } from '@liaoliaots/nestjs-redis';
+import { InjectRedis } from '@liaoliaots/nestjs-redis';
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { Redis } from 'ioredis';
 import { Subject } from 'rxjs';
@@ -12,18 +12,18 @@ export interface IChannelsMap {
 
 @Injectable()
 export class SubscriberService implements OnModuleInit {
-  protected readonly channels_map = {};
+  protected readonly channels_map: IChannelsMap = {};
 
   constructor(@InjectRedis('subscriber') protected readonly redis: Redis) {}
 
   onModuleInit() {
-    const subscription = this.get_stream('one').subscribe((update) => {
-      console.log('UPDATE COMING');
+    this.redis.on('one', (data) => {
+      console.log(data);
     });
   }
 
   public get_stream(id: string): Subject<any> {
-    return this.channels_map[id];
+    return this.channels_map[id].stream;
   }
 
   public async viewer_joined(id: string): Promise<void> {
@@ -32,15 +32,21 @@ export class SubscriberService implements OnModuleInit {
         count: 1,
         stream: new Subject(),
       };
-      this.redis.psubscribe(id);
+      this.redis.subscribe(id);
+
+      this.redis.on('one', (channel, data) => {
+        console.log('MESSAGE', channel, data);
+      });
     }
   }
 
   public async viewer_left(id: string): Promise<void> {
+    console.log(this.channels_map);
+
     this.channels_map[id].count--;
 
-    if (this.channels_map[id].count <= 0) {
-      this.redis.punsubscribe(id);
+    if (this.channels_map?.[id]?.count <= 0) {
+      this.redis.unsubscribe(id);
       delete this.channels_map[id];
     }
   }

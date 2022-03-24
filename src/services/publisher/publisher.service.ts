@@ -7,40 +7,37 @@ export class PublisherService implements OnModuleInit {
   constructor(@InjectRedis('publisher') protected readonly redis: Redis) {}
 
   onModuleInit() {
-    const emit_1 = () => {
-      setTimeout(() => {
-        this.redis.publish('one', 'channel one publishing');
-        emit_1();
-      }, 2500);
-    };
+    this.redis.hgetall('one', (err, res) => {
+      console.log('one', res);
+    });
 
-    emit_1();
+    this.redis.hgetall('two', (err, res) => {
+      console.log('two', res);
+    });
 
-    const emit_2 = () => {
-      setTimeout(() => {
-        this.redis.publish('two', 'channel two publishing');
-        emit_2();
-      }, 2500);
-    };
+    this.redis.hgetall('three', (err, res) => {
+      console.log('three', res);
+    });
 
-    emit_2();
+    this.redis.hgetall('four', (err, res) => {
+      console.log('four', res);
+    });
+  }
 
-    const emit_3 = () => {
-      setTimeout(() => {
-        this.redis.publish('three', 'channel three publishing');
-        emit_4();
-      }, 2500);
-    };
+  public add_donation(id: string, donation: number) {
+    this.redis.hset(id, ['donations']);
+    this.redis.publish(id, JSON.stringify({ donation }));
+  }
 
-    emit_3();
+  public async add_viewer(id: string) {
+    this.redis.hincrby(id, 'viewers', 1).then((value) => {
+      console.log(value);
+    });
+  }
 
-    const emit_4 = () => {
-      setTimeout(() => {
-        this.redis.publish('four', 'channel four publishing');
-        emit_4();
-      }, 2500);
-    };
-
-    emit_4();
+  public async remove_viewer(id: string) {
+    this.redis.hincrby(id, 'viewers', -1).then((value) => {
+      console.log(value);
+    });
   }
 }
