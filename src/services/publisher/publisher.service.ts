@@ -24,6 +24,12 @@ export class PublisherService implements OnModuleInit {
     });
 
     this.redis.hdel('one', 'viewers');
+
+    this.redis.on('*', (data) => {
+      console.log('DATA EXPIRED ON KEY', data);
+    });
+
+    this.redis.config('SET', 'notify-keyspace-events', 'Ex');
   }
 
   public add_donation(id: string, donation: number) {
@@ -34,11 +40,20 @@ export class PublisherService implements OnModuleInit {
 
   public async add_viewer(channel: string, id: string) {
     this.redis.set(id, '');
-    this.redis.expire(id, 300);
+    this.redis.expire(id, 100);
     this.redis.zadd(channel + '_viewers', 0, id);
   }
 
-  public async remove_viewer(id: string) {
-    this.redis.del(id);
+  public async remove_viewer(channel: string, id: string) {
+    this.redis.unlink(id);
+    this.redis.zrem(channel + '_viewers', id);
+  }
+
+  public async maintain_connection(id: string): Promise<void> {
+    this.redis.expire(id, 100);
+  }
+
+  public async get_viewer_count_master(channel: string): Promise<number> {
+    return await this.redis.zcount(channel + '_viewers', 0, 100);
   }
 }

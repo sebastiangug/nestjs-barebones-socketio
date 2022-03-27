@@ -8,27 +8,14 @@ interface ISocket extends Socket {
   id: string;
   subscription: Subscription;
   channel: string;
-  last_views_request: number;
 }
 
-@WebSocketGateway({ cors: true })
+@WebSocketGateway({ cors: true, pingTimeout: 65000, pingInterval: 60000 })
 export class LiveGateway {
   constructor(
     protected readonly publisherService: PublisherService,
     protected readonly subscriberService: SubscriberService,
   ) {}
-
-  @SubscribeMessage('GET_VIEWERS')
-  async handleMEssage(socket: ISocket) {
-    if (socket.last_views_request + 5000 - Date.now() < 0) {
-      socket.emit(
-        'VIEWERS',
-        this.subscriberService.get_viewer_count(socket.channel),
-      );
-    }
-
-    socket.last_views_request = Date.now();
-  }
 
   @SubscribeMessage('DONATION')
   handleMessage(socket: ISocket, donation: number) {
@@ -38,7 +25,11 @@ export class LiveGateway {
   async handleConnection(socket: ISocket) {
     socket.channel = socket.handshake.headers.channel as string;
     socket.id = socket.handshake.headers.id as string;
-    socket.last_views_request = Date.now();
+
+    if (!socket.channel || !socket.id) {
+      socket.disconnect();
+    }
+
     await this.subscriberService.viewer_joined(socket.channel);
     this.publisherService.add_viewer(socket.channel, socket.id);
     socket.subscription = this.subscriberService
@@ -46,11 +37,34 @@ export class LiveGateway {
       .subscribe((event) => {
         socket.emit('DONATIONS', event);
       });
+
+    socket.conn.on('packet', (packet) => {
+      if (packet.type === 'pong') {
+        this.publisherService.maintain_connection(socket.id);
+      }
+    });
+    this.subscriberService.get_viewer_count(socket.channel).then((viewers) => {
+      socket.emit('VIEWERS', { viewers: viewers + 1 });
+    });
+
+    const send_viewers = () => {
+      setTimeout(async () => {
+        const viewers = await this.subscriberService.get_viewer_count(
+          socket.channel,
+        );
+
+        socket.emit('VIEWERS', { viewers });
+
+        send_viewers();
+      }, 5000);
+    };
+
+    send_viewers();
   }
 
   async handleDisconnect(socket: ISocket) {
     socket.subscription.unsubscribe();
     await this.subscriberService.viewer_left(socket.channel);
-    this.publisherService.remove_viewer(socket.id);
+    await this.publisherService.remove_viewer(socket.channel, socket.id);
   }
 }
