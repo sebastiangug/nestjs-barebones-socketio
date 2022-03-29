@@ -7,6 +7,10 @@ export class PublisherService implements OnModuleInit {
   constructor(@InjectRedis('publisher') protected readonly redis: Redis) {}
 
   onModuleInit() {
+    this.redis.on('ready', () => {
+      this.redis.config('SET', 'notify-keyspace-events', 'Ex');
+    });
+
     this.redis.hgetall('one', (err, res) => {
       console.log('one', res);
     });
@@ -41,12 +45,12 @@ export class PublisherService implements OnModuleInit {
   public async add_viewer(channel: string, id: string) {
     this.redis.set(id, '');
     this.redis.expire(id, 100);
-    this.redis.zadd(channel + '_viewers', 0, id);
+    this.redis.zadd(channel + '_viewer', 0, id);
   }
 
   public async remove_viewer(channel: string, id: string) {
     this.redis.unlink(id);
-    this.redis.zrem(channel + '_viewers', id);
+    this.redis.zrem(channel + '_viewer', id);
   }
 
   public async maintain_connection(id: string): Promise<void> {
@@ -54,6 +58,6 @@ export class PublisherService implements OnModuleInit {
   }
 
   public async get_viewer_count_master(channel: string): Promise<number> {
-    return await this.redis.zcount(channel + '_viewers', 0, 100);
+    return await this.redis.zcount(channel + '_viewer', 0, 100);
   }
 }
