@@ -22,16 +22,18 @@ export class SubscriberService implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    // this.redis.on('ready', () => {
-    //   this.redis.config('SET', 'notify-keyspace-events', 'del');
-    // });
-
     this.redis.subscribe('__keyevent@0__:expired');
 
-    this.redis.on('message', (channel, data) => {
-      console.log('NOTIFICATION', channel, data);
+    this.redis.on('message', (arg1, arg2) => {
+      console.log('NOTIFICATION', arg1, arg2);
 
-      this.channels_map?.[channel]?.stream.next(JSON.parse(data));
+      if ((arg2 as string).endsWith(':viewer')) {
+        const viewerKey = arg2.split(':');
+
+        this.publisherService.remove_viewer(viewerKey[1], arg2);
+      }
+
+      this.channels_map?.[arg1]?.stream.next(JSON.parse(arg2));
     });
 
     this.redis.on('*', (data) => {

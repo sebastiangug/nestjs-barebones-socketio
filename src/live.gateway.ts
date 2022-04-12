@@ -43,6 +43,7 @@ export class LiveGateway {
         this.publisherService.maintain_connection(socket.id);
       }
     });
+
     this.subscriberService.get_viewer_count(socket.channel).then((viewers) => {
       socket.emit('VIEWERS', { viewers: viewers + 1 });
     });
@@ -63,6 +64,8 @@ export class LiveGateway {
   }
 
   async handleDisconnect(socket: ISocket) {
+    console.log('HANDLE DISCONNECT HAPPENED', socket.channel, socket.id);
+
     socket.subscription.unsubscribe();
     await this.subscriberService.viewer_left(socket.channel);
     await this.publisherService.remove_viewer(socket.channel, socket.id);

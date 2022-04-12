@@ -6,7 +6,7 @@ import { Redis } from 'ioredis';
 export class PublisherService implements OnModuleInit {
   constructor(@InjectRedis('publisher') protected readonly redis: Redis) {}
 
-  onModuleInit() {
+  async onModuleInit() {
     this.redis.on('ready', () => {
       this.redis.config('SET', 'notify-keyspace-events', 'Ex');
     });
@@ -27,13 +27,15 @@ export class PublisherService implements OnModuleInit {
       console.log('four', res);
     });
 
-    this.redis.hdel('one', 'viewers');
-
-    this.redis.on('*', (data) => {
-      console.log('DATA EXPIRED ON KEY', data);
+    this.redis.zcount('1231231123', 0, 100).then((res) => {
+      console.log('ZCOUNT RES', res);
     });
 
-    this.redis.config('SET', 'notify-keyspace-events', 'Ex');
+    await this.redis.hset('potato', ['something', 1, 'potato', 2]);
+
+    const hash = await this.redis.hget('potato', 'asdadass');
+
+    console.log('HASH GOTTEN FROM HGET', hash);
   }
 
   public add_donation(id: string, donation: number) {
@@ -43,14 +45,15 @@ export class PublisherService implements OnModuleInit {
   }
 
   public async add_viewer(channel: string, id: string) {
+    // setting the viewer key
     this.redis.set(id, '');
     this.redis.expire(id, 100);
-    this.redis.zadd(channel + '_viewer', 0, id);
+    this.redis.zadd(channel + '_viewers', 0, id);
   }
 
   public async remove_viewer(channel: string, id: string) {
     this.redis.unlink(id);
-    this.redis.zrem(channel + '_viewer', id);
+    this.redis.zrem(channel + '_viewers', id);
   }
 
   public async maintain_connection(id: string): Promise<void> {
@@ -58,6 +61,6 @@ export class PublisherService implements OnModuleInit {
   }
 
   public async get_viewer_count_master(channel: string): Promise<number> {
-    return await this.redis.zcount(channel + '_viewer', 0, 100);
+    return await this.redis.zcount(channel + '_viewers', 0, 100);
   }
 }
